@@ -63,7 +63,7 @@ namespace RaceDay.Api.Controllers
             });
         }
 
-        // POST /api/events/{eventId}/categories - Organiser only, must own the event
+        // POST /api/events/{eventId}/categories - Organiser owner only
         [HttpPost("events/{eventId}/categories")]
         [Authorize(Roles = "Organiser")]
         public async Task<ActionResult<object>> CreateCategory(
@@ -100,7 +100,7 @@ namespace RaceDay.Api.Controllers
             _context.Categories.Add(category);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetCategory), new { id = category.CategoryId }, new
+            return Created($"/api/categories/{category.CategoryId}", new
             {
                 category.CategoryId,
                 category.EventId,
@@ -110,7 +110,7 @@ namespace RaceDay.Api.Controllers
             });
         }
 
-        // PUT /api/categories/{id} - Organiser only, must own the parent event
+        // PUT /api/categories/{id} - Organiser owner of parent event only
         [HttpPut("categories/{id}")]
         [Authorize(Roles = "Organiser")]
         public async Task<IActionResult> UpdateCategory(
@@ -148,7 +148,7 @@ namespace RaceDay.Api.Controllers
             return Ok(new { message = "Category updated." });
         }
 
-        // DELETE /api/categories/{id} - Organiser only, must own the parent event
+        // DELETE /api/categories/{id} - Organiser owner of parent event only
         [HttpDelete("categories/{id}")]
         [Authorize(Roles = "Organiser")]
         public async Task<IActionResult> DeleteCategory(int id)

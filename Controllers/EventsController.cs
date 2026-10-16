@@ -18,11 +18,12 @@ namespace RaceDay.Api.Controllers
             _context = context;
         }
 
-        // GET /api/events - public, lists all events
+        // GET /api/events - public
         [HttpGet]
         public async Task<ActionResult<IEnumerable<object>>> GetEvents()
         {
             var events = await _context.Events
+                .Include(e => e.Categories)
                 .Select(e => new
                 {
                     e.EventId,
@@ -39,7 +40,7 @@ namespace RaceDay.Api.Controllers
             return Ok(events);
         }
 
-        // GET /api/events/{id} - public, single event with its categories
+        // GET /api/events/{id} - public
         [HttpGet("{id}")]
         public async Task<ActionResult<object>> GetEvent(int id)
         {
@@ -72,18 +73,16 @@ namespace RaceDay.Api.Controllers
             });
         }
 
-        // POST /api/events - Organiser only. Matches the lecturer's demo:
-        // parameters come in as query string fields (event_name, description,
-        // event_date, location, distance, event_type), not a JSON body.
+        // POST /api/events - Organiser only
         [HttpPost]
         [Authorize(Roles = "Organiser")]
         public async Task<ActionResult<object>> CreateEvent(
             [FromQuery(Name = "event_name")] string eventName,
-            [FromQuery(Name = "description")] string? description,
             [FromQuery(Name = "event_date")] DateTime eventDate,
             [FromQuery(Name = "location")] string location,
             [FromQuery(Name = "distance")] double distance,
-            [FromQuery(Name = "event_type")] EventType eventType)
+            [FromQuery(Name = "event_type")] EventType eventType,
+            [FromQuery(Name = "description")] string? description = null)
         {
             var organiserIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (organiserIdClaim == null || !int.TryParse(organiserIdClaim, out int organiserId))
@@ -99,13 +98,14 @@ namespace RaceDay.Api.Controllers
                 EventDate = eventDate,
                 Location = location,
                 Distance = distance,
-                EventType = eventType
+                EventType = eventType,
+                CreatedAt = DateTime.UtcNow
             };
 
             _context.Events.Add(newEvent);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(GetEvent), new { id = newEvent.EventId }, new
+            return Created($"/api/events/{newEvent.EventId}", new
             {
                 newEvent.EventId,
                 newEvent.Name,
@@ -118,17 +118,17 @@ namespace RaceDay.Api.Controllers
             });
         }
 
-        // PUT /api/events/{id} - Organiser only, must own the event
+        // PUT /api/events/{id} - Organiser owner only
         [HttpPut("{id}")]
         [Authorize(Roles = "Organiser")]
         public async Task<IActionResult> UpdateEvent(
             int id,
             [FromQuery(Name = "event_name")] string eventName,
-            [FromQuery(Name = "description")] string? description,
             [FromQuery(Name = "event_date")] DateTime eventDate,
             [FromQuery(Name = "location")] string location,
             [FromQuery(Name = "distance")] double distance,
-            [FromQuery(Name = "event_type")] EventType eventType)
+            [FromQuery(Name = "event_type")] EventType eventType,
+            [FromQuery(Name = "description")] string? description = null)
         {
             var organiserIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
             if (organiserIdClaim == null || !int.TryParse(organiserIdClaim, out int organiserId))
@@ -159,7 +159,7 @@ namespace RaceDay.Api.Controllers
             return Ok(new { message = "Event updated." });
         }
 
-        // DELETE /api/events/{id} - Organiser only, must own the event
+        // DELETE /api/events/{id} - Organiser owner only
         [HttpDelete("{id}")]
         [Authorize(Roles = "Organiser")]
         public async Task<IActionResult> DeleteEvent(int id)

@@ -22,8 +22,7 @@ namespace RaceDay.Api.Controllers
         }
 
         /// <summary>
-        /// Registers a new user account. Role: Organiser or Participant.
-        /// Date of birth and phone number are optional. Password is hashed before storage.
+        /// Registers a new user. Role: Organiser or Participant.
         /// </summary>
         [HttpPost("register")]
         public async Task<ActionResult<object>> Register(
@@ -32,9 +31,17 @@ namespace RaceDay.Api.Controllers
             [FromQuery(Name = "firstname")] string firstname,
             [FromQuery(Name = "surname")] string surname,
             [FromQuery(Name = "role")] UserRole role,
-            [FromQuery(Name = "dateOfBirth")] DateTime? dateOfBirth,
-            [FromQuery(Name = "phoneNumber")] string? phoneNumber)
+            [FromQuery(Name = "dateOfBirth")] DateTime? dateOfBirth = null,
+            [FromQuery(Name = "phoneNumber")] string? phoneNumber = null)
         {
+            if (string.IsNullOrWhiteSpace(email) ||
+                string.IsNullOrWhiteSpace(password) ||
+                string.IsNullOrWhiteSpace(firstname) ||
+                string.IsNullOrWhiteSpace(surname))
+            {
+                return BadRequest(new { message = "Missing required fields." });
+            }
+
             bool emailExists = await _context.Users.AnyAsync(u => u.Email == email);
             if (emailExists)
             {
@@ -56,7 +63,7 @@ namespace RaceDay.Api.Controllers
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
 
-            return CreatedAtAction(nameof(Register), new { id = user.UserId }, new
+            return StatusCode(StatusCodes.Status201Created, new
             {
                 user.UserId,
                 user.FirstName,
@@ -69,8 +76,7 @@ namespace RaceDay.Api.Controllers
         }
 
         /// <summary>
-        /// Authenticates a user and creates a server-side session.
-        /// The session stores the user's id, email, and role.
+        /// Authenticates a user and creates a server-side session (cookie).
         /// </summary>
         [HttpPost("login")]
         public async Task<ActionResult<object>> Login(
@@ -98,8 +104,8 @@ namespace RaceDay.Api.Controllers
                 new Claim(ClaimTypes.Role, user.Role)
             };
 
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-            var authProperties = new AuthenticationProperties
+            var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var props = new AuthenticationProperties
             {
                 IsPersistent = true,
                 ExpiresUtc = DateTimeOffset.UtcNow.AddHours(8)
@@ -107,8 +113,8 @@ namespace RaceDay.Api.Controllers
 
             await HttpContext.SignInAsync(
                 CookieAuthenticationDefaults.AuthenticationScheme,
-                new ClaimsPrincipal(claimsIdentity),
-                authProperties);
+                new ClaimsPrincipal(identity),
+                props);
 
             return Ok(new
             {
@@ -121,7 +127,7 @@ namespace RaceDay.Api.Controllers
         }
 
         /// <summary>
-        /// Signs the current user out, clearing their server-side session.
+        /// Signs out the current user.
         /// </summary>
         [HttpPost("logout")]
         public async Task<IActionResult> Logout()
